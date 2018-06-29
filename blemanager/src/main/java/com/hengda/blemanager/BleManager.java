@@ -223,13 +223,13 @@ public class BleManager {
         }
     };
 
-    interface OnBleConnListener {
+    public interface OnBleConnListener {
         void onConnSuccess();
 
         void onConnFail();
     }
 
-    interface OnLockOrUnLockListener {
+    public interface OnLockOrUnLockListener {
         void onLockOrUnLockWrite();
 
         void onLockOrUnLockSuccess();
@@ -239,7 +239,7 @@ public class BleManager {
         void onLockOrUnLockNoNeed();
     }
 
-    interface OnCorrectListener {
+    public interface OnCorrectListener {
         void onCorrectSuccess();
 
         void onCorrectFail();
