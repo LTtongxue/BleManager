@@ -21,7 +21,7 @@ public class ProtocolParkingBaseLockWrite extends ProtocolBase {
         super((byte) 0xF3, nodeId);
     }
 
-    public byte[] buildCmd() {
+    public byte[] buildCmd(int type) {
         LByteArray ldata = new LByteArray();
         ldata.append((byte) 0x00);  // 序号
 
@@ -31,7 +31,11 @@ public class ProtocolParkingBaseLockWrite extends ProtocolBase {
         ldata.append((byte) 0x00);  // 写入的数据长度
         ldata.append((byte) 0x01);
 
-        ldata.append((byte) 0x90);  // 服务器开锁命令
+        if (type == 1) {
+            ldata.append((byte) 0x90);  // 服务器开锁命令
+        } else {
+            ldata.append((byte) 0x50);  // 服务器上锁命令
+        }
 
         data = ldata.data();
         return encode();

@@ -19,9 +19,9 @@ public class ProtocolParkingBaseLockState extends ProtocolBase {
                 && data[6] == (byte) 0x7E
                 && data[7] == (byte) 0x00
                 && data[8] == (byte) 0x0A) {
-            if ((data[13] & (byte) 0x80) == (byte) 0x80) {//开锁成功
+            if ((data[13] & (byte) 0x80) == (byte) 0x80 || (data[13] & (byte) 0x60) == (byte) 0x60) {//开锁或上锁成功
                 lockState = 0;
-            } else {//开锁失败
+            } else {//开锁或上锁失败
                 lockState = 1;
             }
         } else if (funCode == FunCode.FUN_NODE_READ

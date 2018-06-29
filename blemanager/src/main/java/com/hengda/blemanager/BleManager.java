@@ -1,5 +1,6 @@
 package com.hengda.blemanager;
 
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -25,14 +26,18 @@ public class BleManager {
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothGatt mBluetoothGatt;
     private BluetoothGattCharacteristic mBluetoothGattCharacteristic;
-    private static LockResultHandler sLockResultHandler;
     private Parser mParser = new Parser();
+    private OnBleConnListener mOnBleConnListener;
+    private OnLockOrUnLockListener mOnLockOrUnLockListener;
+    private OnCorrectListener mOnCorrectListener;
+    private int type = 0;//开锁或上锁
 
     public static BleManager getInstance() {
         return BleManagerHolder.sBleManager;
     }
 
     private static class BleManagerHolder {
+        @SuppressLint("StaticFieldLeak")
         private static final BleManager sBleManager = new BleManager();
     }
 
@@ -53,17 +58,18 @@ public class BleManager {
     }
 
     /**
-     * is support ble?
+     * 是否支持蓝牙
      *
-     * @return
+     * @return true
      */
+    @SuppressLint("ObsoleteSdkInt")
     private boolean isSupportBle() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
                 && mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
     }
 
     /**
-     * Open bluetooth
+     * 打开蓝牙
      */
     private void enableBluetooth() {
         if (mBluetoothAdapter != null) {
@@ -72,7 +78,7 @@ public class BleManager {
     }
 
     /**
-     * Disable bluetooth
+     * 关闭蓝牙
      */
     private void disableBluetooth() {
         if (mBluetoothAdapter != null) {
@@ -83,24 +89,22 @@ public class BleManager {
     }
 
     /**
-     * judge Bluetooth is enable
+     * 判断蓝牙是否可用
      *
-     * @return
+     * @return true
      */
     private boolean isBlueEnable() {
         return mBluetoothAdapter != null && mBluetoothAdapter.isEnabled();
     }
 
     /**
-     * connect a known device
-     *
-     * @return
+     * 连接蓝牙
      */
-    public void connect(final String mac, LockResultHandler lockResultHandler) {
+    public void connectBle(String mac, OnBleConnListener onBleConnListener) {
         try {
             //2s之后连接
             Thread.sleep(2000);
-            sLockResultHandler = lockResultHandler;
+            mOnBleConnListener = onBleConnListener;
             if (mBluetoothGatt != null) {
                 mBluetoothGatt.close();
                 mBluetoothGatt = null;
@@ -116,6 +120,24 @@ public class BleManager {
     }
 
     /**
+     * 开锁
+     */
+    public void unLock(String nodeId, OnLockOrUnLockListener onLockResultListener) {
+        mOnLockOrUnLockListener = onLockResultListener;
+        type = 1;
+        readData(nodeId);
+    }
+
+    /**
+     * 上锁
+     */
+    public void lock(String nodeId, OnLockOrUnLockListener onLockResultListener) {
+        mOnLockOrUnLockListener = onLockResultListener;
+        type = 2;
+        readData(nodeId);
+    }
+
+    /**
      * 实现连接成功或者失败状态的回调
      */
     private BluetoothGattCallback gattCallBack = new BluetoothGattCallback() {
@@ -124,13 +146,12 @@ public class BleManager {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {//连接成功
-                Log.d(TAG, "bluetooth connect!");
                 //连接成功后去发现该连接的设备的服务
+                Log.d(TAG, "蓝牙发现服务");
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {//连接失败 或者连接断开都会调用此方法
-                Log.d(TAG, "bluetooth disconnect!");
-                Log.d(TAG, "开锁失败");
-                BleManager.sLockResultHandler.onLockFail();
+                Log.d(TAG, "蓝牙连接失败");
+                mOnBleConnListener.onConnFail();
                 closeConnect();
             }
         }
@@ -140,7 +161,6 @@ public class BleManager {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {//发现该设备的服务
                 mBluetoothGatt = gatt;
-                Log.d(TAG, "bluetooth: discover!");
                 //拿到该服务 1,通过UUID拿到指定的服务  2,可以拿到该设备上所有服务的集合
                 List<BluetoothGattService> serviceList = gatt.getServices();
                 //可以遍历获得该设备上的服务集合，通过服务可以拿到该服务的UUID，和该服务里的所有属性Characteristic
@@ -148,7 +168,7 @@ public class BleManager {
                     if (bs.getUuid().toString().equals(UUID_SERVICE.toString())) {
                         mBluetoothGattCharacteristic = bs.getCharacteristic(UUID_NOTIFY);
                         gatt.setCharacteristicNotification(mBluetoothGattCharacteristic, true);
-                        BleManager.sLockResultHandler.onLockRead();
+                        mOnBleConnListener.onConnSuccess();
                         break;
                     }
                 }
@@ -171,20 +191,29 @@ public class BleManager {
                             ProtocolParkingBaseLockState lockState = (ProtocolParkingBaseLockState) base;
                             Log.d(TAG, "lockState == " + lockState.getLockState());
                             switch (lockState.getLockState()) {
-                                case 0://开锁成功
-                                    BleManager.sLockResultHandler.onLockSuccess();
+                                case 0://开锁或上锁成功
+                                    mOnLockOrUnLockListener.onLockOrUnLockSuccess();
                                     closeConnect();
                                     break;
-                                case 1://开锁失败
-                                    BleManager.sLockResultHandler.onLockFail();
+                                case 1://开锁或上锁失败
+                                    mOnLockOrUnLockListener.onLockOrUnLockFail();
                                     closeConnect();
                                     break;
                                 case 2://开锁状态
-                                    BleManager.sLockResultHandler.onLockNoNeed();
+                                    if (type == 1) {//开锁
+                                        mOnLockOrUnLockListener.onLockOrUnLockNoNeed();
+                                    } else {
+                                        mOnLockOrUnLockListener.onLockOrUnLockWrite();
+                                    }
                                     closeConnect();
                                     break;
                                 case 3://上锁状态
-                                    BleManager.sLockResultHandler.onLockWrite();
+                                    if (type == 1) {//开锁
+                                        mOnLockOrUnLockListener.onLockOrUnLockWrite();
+                                    } else {
+                                        mOnLockOrUnLockListener.onLockOrUnLockNoNeed();
+                                    }
+                                    closeConnect();
                                     break;
                             }
                         }
@@ -194,12 +223,34 @@ public class BleManager {
         }
     };
 
+    interface OnBleConnListener {
+        void onConnSuccess();
+
+        void onConnFail();
+    }
+
+    interface OnLockOrUnLockListener {
+        void onLockOrUnLockWrite();
+
+        void onLockOrUnLockSuccess();
+
+        void onLockOrUnLockFail();
+
+        void onLockOrUnLockNoNeed();
+    }
+
+    interface OnCorrectListener {
+        void onCorrectSuccess();
+
+        void onCorrectFail();
+    }
+
     /**
      * 读数据
      *
      * @param nodeId 节点id(云锁编号)
      */
-    public void readData(String nodeId) {
+    private void readData(String nodeId) {
         ProtocolParkingBaseLockRead p = new ProtocolParkingBaseLockRead(nodeId);
         byte[] dataArray = p.buildCmd();
         if (dataArray != null) {
@@ -223,7 +274,7 @@ public class BleManager {
      */
     public void writeData(String nodeId) {
         ProtocolParkingBaseLockWrite p = new ProtocolParkingBaseLockWrite(nodeId);
-        byte[] dataArray = p.buildCmd();
+        byte[] dataArray = p.buildCmd(type);
         if (dataArray != null) {
             for (byte[] data : MISC.splitByteArray(dataArray)) {
                 mBluetoothGattCharacteristic.setValue(data);
@@ -256,18 +307,6 @@ public class BleManager {
             }
         }
         return false;
-    }
-
-    public interface LockResultHandler {
-        void onLockRead();
-
-        void onLockWrite();
-
-        void onLockNoNeed();
-
-        void onLockSuccess();
-
-        void onLockFail();
     }
 
     /**
