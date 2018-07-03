@@ -24,13 +24,14 @@ public class BleManager {
     private static UUID UUID_NOTIFY = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
     private static UUID UUID_SERVICE = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb");//蓝牙特征值
     private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothDevice mBluetoothDevice;
     private BluetoothGatt mBluetoothGatt;
     private BluetoothGattCharacteristic mBluetoothGattCharacteristic;
     private Parser mParser = new Parser();
     private OnBleConnListener mOnBleConnListener;
     private OnLockOrUnLockListener mOnLockOrUnLockListener;
     private OnCorrectListener mOnCorrectListener;
-    private int type = 0;//开锁或上锁
+    private int type = 0;//开锁上锁、上下到位校准
 
     public static BleManager getInstance() {
         return BleManagerHolder.sBleManager;
@@ -105,15 +106,29 @@ public class BleManager {
             //2s之后连接
             Thread.sleep(2000);
             mOnBleConnListener = onBleConnListener;
-            if (mBluetoothGatt != null) {
-                mBluetoothGatt.close();
-                mBluetoothGatt = null;
-            }
+            closeConnect();
             //通过蓝牙设备地址 获取远程设备 开始连接
-            BluetoothDevice bluetoothDevice = mBluetoothAdapter.getRemoteDevice(mac);
+            mBluetoothDevice = mBluetoothAdapter.getRemoteDevice(mac);
             //第二个参数 是否要自动连接
-            mBluetoothGatt = bluetoothDevice.connectGatt(mContext, false, gattCallBack);
+            if (mBluetoothDevice != null) {
+                mBluetoothGatt = mBluetoothDevice.connectGatt(mContext, false, gattCallBack);
+            }
             Log.d(TAG, "BluetoothGatt.connect() == " + mBluetoothGatt.connect());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 重连
+     */
+    private void reconnectBle() {
+        try {
+            if (mBluetoothDevice != null) {
+                mBluetoothGatt = mBluetoothDevice.connectGatt(mContext, false, gattCallBack);
+                Thread.sleep(2000);
+                Log.d(TAG, "reconnectBle: ");
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -123,8 +138,11 @@ public class BleManager {
      * 开锁
      */
     public void unLock(String nodeId, OnLockOrUnLockListener onLockResultListener) {
+        if (mBluetoothGatt == null) {
+            reconnectBle();
+        }
         mOnLockOrUnLockListener = onLockResultListener;
-        type = 1;
+        type = ControlLockType.UNLOCK;
         readData(nodeId);
     }
 
@@ -132,9 +150,36 @@ public class BleManager {
      * 上锁
      */
     public void lock(String nodeId, OnLockOrUnLockListener onLockResultListener) {
+        if (mBluetoothGatt == null) {
+            reconnectBle();
+        }
         mOnLockOrUnLockListener = onLockResultListener;
-        type = 2;
+        type = ControlLockType.LOCK;
         readData(nodeId);
+    }
+
+    /**
+     * 下到位校准
+     */
+    public void downCorrect(String nodeId, OnCorrectListener onCorrectListener) {
+        if (mBluetoothGatt == null) {
+            reconnectBle();
+        }
+        mOnCorrectListener = onCorrectListener;
+        type = ControlLockType.DOWN_CORRECT;
+        writeData(nodeId);
+    }
+
+    /**
+     * 上到位校准
+     */
+    public void upCorrect(String nodeId, OnCorrectListener onCorrectListener) {
+        if (mBluetoothGatt == null) {
+            reconnectBle();
+        }
+        mOnCorrectListener = onCorrectListener;
+        type = ControlLockType.UP_CORRECT;
+        writeData(nodeId);
     }
 
     /**
@@ -185,33 +230,45 @@ public class BleManager {
                 for (ProtocolBase base : list) {
                     //判断数据帧有效
                     if (base.isValid()) {
-                        if (base.getFunCode() == FunCode.FUN_NODE_WRITE) {//收到回复,提示正在开锁
-                            Log.d(TAG, "等待蓝牙开锁");
-                        } else if (base.getFunCode() == FunCode.FUN_NODE_REPORT || base.getFunCode() == FunCode.FUN_NODE_READ) {
+                        if (base.getFunCode() == FunCode.FUN_NODE_WRITE) {//收到回复,提示开锁上锁、上下到位校准
+                            if (type == ControlLockType.UP_CORRECT || type == ControlLockType.DOWN_CORRECT) {
+                                mOnCorrectListener.onCorrectSuccess();
+                            }
+                        } else if (base.getFunCode() == FunCode.FUN_NODE_READ) {//F2读取设备状态
                             ProtocolParkingBaseLockState lockState = (ProtocolParkingBaseLockState) base;
-                            Log.d(TAG, "lockState == " + lockState.getLockState());
-                            switch (lockState.getLockState()) {
-                                case 0://开锁或上锁成功
-                                    mOnLockOrUnLockListener.onLockOrUnLockSuccess();
-                                    closeConnect();
-                                    break;
-                                case 1://开锁或上锁失败
-                                    mOnLockOrUnLockListener.onLockOrUnLockFail();
-                                    closeConnect();
-                                    break;
-                                case 2://开锁状态
-                                    if (type == 1) {//开锁
+                            switch (type) {
+                                case ControlLockType.LOCK://上锁
+                                    if (lockState.isLockOn()) {
                                         mOnLockOrUnLockListener.onLockOrUnLockNoNeed();
                                     } else {
                                         mOnLockOrUnLockListener.onLockOrUnLockWrite();
                                     }
+                                    break;
+                                case ControlLockType.UNLOCK://开锁
+                                    if (!lockState.isLockOn()) {
+                                        mOnLockOrUnLockListener.onLockOrUnLockNoNeed();
+                                    } else {
+                                        mOnLockOrUnLockListener.onLockOrUnLockWrite();
+                                    }
+                                    break;
+                            }
+                        } else if (base.getFunCode() == FunCode.FUN_NODE_REPORT) {//A4上报状态
+                            ProtocolParkingBaseLockState lockState = (ProtocolParkingBaseLockState) base;
+                            replyData(lockState.getID(), lockState.data[0]);
+                            switch (type) {
+                                case ControlLockType.LOCK://上锁
+                                    if (lockState.isLockOn()) {
+                                        mOnLockOrUnLockListener.onLockOrUnLockSuccess();
+                                    } else {
+                                        mOnLockOrUnLockListener.onLockOrUnLockFail();
+                                    }
                                     closeConnect();
                                     break;
-                                case 3://上锁状态
-                                    if (type == 1) {//开锁
-                                        mOnLockOrUnLockListener.onLockOrUnLockWrite();
+                                case ControlLockType.UNLOCK://开锁
+                                    if (!lockState.isLockOn()) {
+                                        mOnLockOrUnLockListener.onLockOrUnLockSuccess();
                                     } else {
-                                        mOnLockOrUnLockListener.onLockOrUnLockNoNeed();
+                                        mOnLockOrUnLockListener.onLockOrUnLockFail();
                                     }
                                     closeConnect();
                                     break;
@@ -255,14 +312,18 @@ public class BleManager {
         byte[] dataArray = p.buildCmd();
         if (dataArray != null) {
             for (byte[] data : MISC.splitByteArray(dataArray)) {
-                mBluetoothGattCharacteristic.setValue(data);
                 try {
+                    if (mBluetoothGattCharacteristic != null) {
+                        mBluetoothGattCharacteristic.setValue(data);
+                    }
                     Thread.sleep(10);
-                } catch (InterruptedException e) {
+                    if (mBluetoothGatt != null) {
+                        mBluetoothGatt.writeCharacteristic(mBluetoothGattCharacteristic);
+                    }
+                    Log.d(TAG, "发送：" + MISC.byteArray2String(data));
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-                mBluetoothGatt.writeCharacteristic(mBluetoothGattCharacteristic);
-                Log.d(TAG, "发送：" + MISC.byteArray2String(data));
             }
         }
     }
@@ -277,13 +338,38 @@ public class BleManager {
         byte[] dataArray = p.buildCmd(type);
         if (dataArray != null) {
             for (byte[] data : MISC.splitByteArray(dataArray)) {
-                mBluetoothGattCharacteristic.setValue(data);
                 try {
+                    if (mBluetoothGattCharacteristic != null) {
+                        mBluetoothGattCharacteristic.setValue(data);
+                    }
                     Thread.sleep(10);
-                } catch (InterruptedException e) {
+                    if (mBluetoothGatt != null) {
+                        mBluetoothGatt.writeCharacteristic(mBluetoothGattCharacteristic);
+                    }
+                    Log.d(TAG, "发送：" + MISC.byteArray2String(data));
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-                mBluetoothGatt.writeCharacteristic(mBluetoothGattCharacteristic);
+            }
+        }
+    }
+
+    /**
+     * 向云锁回复收到A4数据
+     *
+     * @param nodeId 节点id(云锁编号)
+     */
+    private void replyData(String nodeId, byte index) {
+        ProtocolParkingBaseLockReply p = new ProtocolParkingBaseLockReply(nodeId);
+        byte[] dataArray = p.buildCmd(index);
+        if (dataArray != null) {
+            for (byte[] data : MISC.splitByteArray(dataArray)) {
+                if (mBluetoothGattCharacteristic != null) {
+                    mBluetoothGattCharacteristic.setValue(data);
+                }
+                if (mBluetoothGatt != null) {
+                    mBluetoothGatt.writeCharacteristic(mBluetoothGattCharacteristic);
+                }
                 Log.d(TAG, "发送：" + MISC.byteArray2String(data));
             }
         }
@@ -291,8 +377,6 @@ public class BleManager {
 
     /**
      * 清除蓝牙缓存
-     * Clears the internal cache and forces a refresh of the services from the
-     * remote device.
      */
     private boolean refreshDeviceCache() {
         if (mBluetoothGatt != null) {
@@ -300,7 +384,9 @@ public class BleManager {
                 BluetoothGatt localBluetoothGatt = mBluetoothGatt;
                 Method localMethod = localBluetoothGatt.getClass().getMethod("refresh", new Class[0]);
                 if (localMethod != null) {
-                    return (boolean) localMethod.invoke(localBluetoothGatt, new Object[0]);
+                    boolean bool = (Boolean) localMethod.invoke(
+                            localBluetoothGatt, new Object[0]);
+                    return bool;
                 }
             } catch (Exception localException) {
                 Log.d(TAG, localException.toString());
@@ -312,7 +398,7 @@ public class BleManager {
     /**
      * 断开连接
      */
-    private void closeConnect() {
+    public void closeConnect() {
         if (mBluetoothGatt != null) {
             mBluetoothGatt.disconnect();
             refreshDeviceCache();

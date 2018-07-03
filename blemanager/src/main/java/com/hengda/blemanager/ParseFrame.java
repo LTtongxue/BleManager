@@ -6,7 +6,7 @@ import java.util.List;
 public class ParseFrame {
     private LByteArray ldata;
 
-    public ParseFrame() {
+    ParseFrame() {
         ldata = new LByteArray();
     }
 

@@ -6,7 +6,7 @@ public class MISC {
         return ((int) value & 0x000000ff);
     }
 
-    public static String byte2String(byte value) {
+    private static String byte2String(byte value) {
         String str = "";
         if (byte2Int(value) < 0x10) {
             str += "0";
@@ -38,8 +38,8 @@ public class MISC {
 
     public static byte xorCheck(byte[] dataArray) {
         byte xorCrc = 0;
-        for (int i = 0; i < dataArray.length; i++) {
-            xorCrc ^= dataArray[i];
+        for (byte aDataArray : dataArray) {
+            xorCrc ^= aDataArray;
         }
         return xorCrc;
     }
@@ -104,16 +104,16 @@ public class MISC {
         String[] ipArray = ipstr.split("\\.");
         byte[] ipByteArray = new byte[4];
 
-        ipByteArray[0] = (byte) ((Integer.valueOf(ipArray[0]).intValue() & 0x000000ff));
-        ipByteArray[1] = (byte) ((Integer.valueOf(ipArray[1]).intValue() & 0x000000ff));
-        ipByteArray[2] = (byte) ((Integer.valueOf(ipArray[2]).intValue() & 0x000000ff));
-        ipByteArray[3] = (byte) ((Integer.valueOf(ipArray[3]).intValue() & 0x000000ff));
+        ipByteArray[0] = (byte) ((Integer.valueOf(ipArray[0]) & 0x000000ff));
+        ipByteArray[1] = (byte) ((Integer.valueOf(ipArray[1]) & 0x000000ff));
+        ipByteArray[2] = (byte) ((Integer.valueOf(ipArray[2]) & 0x000000ff));
+        ipByteArray[3] = (byte) ((Integer.valueOf(ipArray[3]) & 0x000000ff));
         return ipByteArray;
     }
 
     public static String byteArray2Ip(byte[] array, int offset) {
-        String ipStr = new String();
-        ipStr += Integer.toString(byte2Int(array[offset + 0]));
+        String ipStr = "";
+        ipStr += Integer.toString(byte2Int(array[offset]));
         ipStr += ".";
         ipStr += Integer.toString(byte2Int(array[offset + 1]));
         ipStr += ".";

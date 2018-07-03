@@ -6,7 +6,7 @@ import android.util.Log;
 import android.view.View;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "MainActivity";
+    private static final String TAG = "BleManager";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -14,12 +14,13 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         //模拟{"userOperate":2,"prId":3,"baseLockInstruct":"F41011","bluetoothMacAddress":"00:15:87:00:86:CF","type":10}
-        //真实{"userOperate":2,"prId":3,"baseLockInstruct":"F40002","bluetoothMacAddress":"34:15:13:DD:8F:40","type":10}
-        BleManager.getInstance().init(MainActivity.this);
+        //真实{"userOperate":2,"prId":3,"baseLockInstruct":"F40010","bluetoothMacAddress":"34:15:13:DD:2C:7F","type":10}
+        //连接蓝牙
         findViewById(R.id.tv_ble_conn).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                BleManager.getInstance().connectBle("34:15:13:DD:8F:40", new BleManager.OnBleConnListener() {
+                BleManager.getInstance().init(MainActivity.this);
+                BleManager.getInstance().connectBle("34:15:13:DD:2C:7F", new BleManager.OnBleConnListener() {
                     @Override
                     public void onConnSuccess() {
                         Log.d(TAG, "onConnSuccess: ");
@@ -33,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        //开锁
         findViewById(R.id.tv_unlock).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -60,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        //上锁
         findViewById(R.id.tv_lock).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -84,6 +87,50 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "onLockOrUnLockNoNeed: ");
                     }
                 });
+            }
+        });
+
+        //下到位
+        findViewById(R.id.tv_down_correct).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                BleManager.getInstance().downCorrect("F40010", new BleManager.OnCorrectListener() {
+                    @Override
+                    public void onCorrectSuccess() {
+                        Log.d(TAG, "onCorrectSuccess: ");
+                    }
+
+                    @Override
+                    public void onCorrectFail() {
+                        Log.d(TAG, "onCorrectFail: ");
+                    }
+                });
+            }
+        });
+
+        //上到位
+        findViewById(R.id.tv_up_correct).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                BleManager.getInstance().upCorrect("F40010", new BleManager.OnCorrectListener() {
+                    @Override
+                    public void onCorrectSuccess() {
+                        Log.d(TAG, "onCorrectSuccess: ");
+                    }
+
+                    @Override
+                    public void onCorrectFail() {
+                        Log.d(TAG, "onCorrectFail: ");
+                    }
+                });
+            }
+        });
+
+        //断开连接
+        findViewById(R.id.tv_close_connect).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                BleManager.getInstance().closeConnect();
             }
         });
     }

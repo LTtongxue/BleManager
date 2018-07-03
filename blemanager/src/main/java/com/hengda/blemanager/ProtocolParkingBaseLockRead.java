@@ -2,7 +2,7 @@ package com.hengda.blemanager;
 
 public class ProtocolParkingBaseLockRead extends ProtocolBase {
 
-    public ProtocolParkingBaseLockRead(String nodeId) {
+    ProtocolParkingBaseLockRead(String nodeId) {
         super((byte) 0xF2, nodeId);
     }
 

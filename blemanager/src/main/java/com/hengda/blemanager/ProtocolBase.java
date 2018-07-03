@@ -3,13 +3,13 @@ package com.hengda.blemanager;
 import java.io.Serializable;
 
 public class ProtocolBase implements Serializable {
-    protected byte funCode;
-    protected byte[] frame;
+    byte funCode;
+    private byte[] frame;
     protected byte[] data;
-    protected String deviceId;
-    protected boolean valid;
+    private String deviceId;
+    boolean valid;
 
-    public ProtocolBase(LByteArray lframe) {
+    ProtocolBase(LByteArray lframe) {
         this.frame = lframe.data();
 
         data = lframe.mid(8);
@@ -19,7 +19,7 @@ public class ProtocolBase implements Serializable {
         valid = true;
     }
 
-    public ProtocolBase(byte funCode, String deviceId) {
+    ProtocolBase(byte funCode, String deviceId) {
         this.funCode = funCode;
         if (deviceId.length() == 4) {
             this.deviceId = "00" + deviceId;
@@ -28,7 +28,7 @@ public class ProtocolBase implements Serializable {
         }
     }
 
-    protected byte[] encode() {
+    byte[] encode() {
         byte frameHead = (byte) 0xAA;
 
         LByteArray frame = new LByteArray();

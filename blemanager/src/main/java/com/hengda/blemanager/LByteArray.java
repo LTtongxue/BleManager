@@ -5,16 +5,16 @@ public class LByteArray {
 
     private byte[] data;
 
-    public LByteArray() {
+    LByteArray() {
         data = null;
     }
 
-    public LByteArray(LByteArray src) {
+    LByteArray(LByteArray src) {
         data = new byte[src.length()];
         System.arraycopy(src.data(), 0, data, 0, src.length());
     }
 
-    public LByteArray(byte[] src) {
+    LByteArray(byte[] src) {
         append(src);
     }
 
