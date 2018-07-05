@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BleManager";
@@ -24,11 +25,23 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onConnSuccess() {
                         Log.d(TAG, "onConnSuccess: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onConnSuccess", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onConnFail() {
                         Log.d(TAG, "onConnFail: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onConnFail", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
                 });
             }
@@ -47,16 +60,34 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onLockOrUnLockSuccess() {
                         Log.d(TAG, "onLockOrUnLockSuccess: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockSuccess", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onLockOrUnLockFail() {
                         Log.d(TAG, "onLockOrUnLockFail: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockFail", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onLockOrUnLockNoNeed() {
                         Log.d(TAG, "onLockOrUnLockNoNeed: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockNoNeed", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
                 });
             }
@@ -75,16 +106,34 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onLockOrUnLockSuccess() {
                         Log.d(TAG, "onLockOrUnLockSuccess: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockSuccess", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onLockOrUnLockFail() {
                         Log.d(TAG, "onLockOrUnLockFail: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockFail", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onLockOrUnLockNoNeed() {
                         Log.d(TAG, "onLockOrUnLockNoNeed: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onLockOrUnLockNoNeed", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
                 });
             }
@@ -98,11 +147,23 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onCorrectSuccess() {
                         Log.d(TAG, "onCorrectSuccess: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onCorrectSuccess", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
 
                     @Override
                     public void onCorrectFail() {
                         Log.d(TAG, "onCorrectFail: ");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this, "onCorrectFail", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
                 });
             }
@@ -130,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.tv_close_connect).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                BleManager.getInstance().closeConnect();
+                BleManager.getInstance().disConnect();
             }
         });
     }

@@ -262,7 +262,7 @@ public class BleManager {
                                     } else {
                                         mOnLockOrUnLockListener.onLockOrUnLockFail();
                                     }
-                                    closeConnect();
+                                    disConnect();
                                     break;
                                 case ControlLockType.UNLOCK://开锁
                                     if (!lockState.isLockOn()) {
@@ -270,7 +270,7 @@ public class BleManager {
                                     } else {
                                         mOnLockOrUnLockListener.onLockOrUnLockFail();
                                     }
-                                    closeConnect();
+                                    disConnect();
                                     break;
                             }
                         }
@@ -398,13 +398,23 @@ public class BleManager {
     /**
      * 断开连接
      */
-    public void closeConnect() {
-        if (mBluetoothGatt != null) {
-            mBluetoothGatt.disconnect();
-            refreshDeviceCache();
-            mBluetoothGatt.close();
-            mBluetoothGatt = null;
+    public void disConnect() {
+        if (mBluetoothGatt == null) {
+            return;
         }
+        mBluetoothGatt.disconnect();
+    }
+
+    /**
+     * 关闭连接
+     */
+    public void closeConnect() {
+        if (mBluetoothGatt == null) {
+            return;
+        }
+        refreshDeviceCache();
+        mBluetoothGatt.close();
+        mBluetoothGatt = null;
 //        disableBluetooth();
     }
 }
