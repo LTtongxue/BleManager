@@ -20,4 +20,22 @@ android {
 }
 
 dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    testImplementation 'junit:junit:4.12'
 }
+
+task makeJar(type: Copy) {
+    //删除存在的
+    delete 'build/libs/blemanager.jar'
+    //设置拷贝的文件
+    from('build/intermediates/packaged-classes/debug/')
+    //打进jar包后的文件目录
+    into('build/libs/')
+    //将classes.jar放入build/libs/目录下
+    include('classes.jar')
+    //重命名
+    rename('classes.jar', 'blemanager.jar')
+}
+
+makeJar.dependsOn(build)

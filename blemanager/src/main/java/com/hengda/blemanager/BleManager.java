@@ -372,7 +372,7 @@ public class BleManager {
                 }
                 Log.d(TAG, "发送：" + MISC.byteArray2String(data));
             }
-        }
+        }                                              
     }
 
     /**
