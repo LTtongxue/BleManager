@@ -1,45 +1,87 @@
 package com.hengda.blemanager;
 
+import android.Manifest;
+import android.app.Activity;
+import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
+import android.os.Handler;
+import android.text.TextUtils;
+import android.view.MotionEvent;
 import android.view.View;
+import android.widget.PopupWindow;
+import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "BleManager";
+import java.util.List;
+
+public class MainActivity extends Activity {
+    private static final String TAG = "MainActivity";
+    private CarPortSpinner mCarPortSpinner;
+    private TextView mTvCarPort, mTvBleConn, mTvUnlock, mTvLock;
+    private LoadingDialog mLoadingDialog;
+    private BleManager mBleManager;
+    private String[] carPortNum;
+    private List<BluetoothDevice> mBluetoothDeviceList;
+    private String mMacAddress = "";
+    private String mNodeId = "";
+    private Handler mHandler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initView();
+        setListener();
+    }
 
-        //模拟{"userOperate":2,"prId":3,"baseLockInstruct":"F41011","bluetoothMacAddress":"00:15:87:00:86:CF","type":10}
-        //真实{"userOperate":2,"prId":3,"baseLockInstruct":"F40010","bluetoothMacAddress":"34:15:13:DD:2C:7F","type":10}
-        //连接蓝牙
-        findViewById(R.id.tv_ble_conn).setOnClickListener(new View.OnClickListener() {
+    private void initView() {
+        PermissionUtils.setPermisson(this, "定位",
+                Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION);
+        mTvCarPort = findViewById(R.id.tv_car_port);
+        mTvBleConn = findViewById(R.id.tv_ble_conn);
+        mTvUnlock = findViewById(R.id.tv_unlock);
+        mTvLock = findViewById(R.id.tv_lock);
+        mBleManager = BleManager.getInstance();
+        mBleManager.init(MainActivity.this);
+        mBleManager.scanBluetoothDevice(true);
+    }
+
+    private void setListener() {
+        mTvCarPort.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                BleManager.getInstance().init(MainActivity.this);
-                BleManager.getInstance().connectBle("A8:1B:6A:AC:56:53", new BleManager.OnBleConnListener() {
+                chooseCarPort();
+            }
+        });
+
+        //连接蓝牙
+        mTvBleConn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (TextUtils.isEmpty(mMacAddress)) {
+                    Toast.makeText(MainActivity.this, "请选择车位连接蓝牙", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                getLoadDialog().showDialog("蓝牙连接中,请等待");
+                mBleManager.connectBle(mMacAddress, new BleManager.OnBleConnListener() {
                     @Override
                     public void onConnSuccess() {
-                        Log.d(TAG, "onConnSuccess: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onConnSuccess", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                mTvBleConn.setText("连接成功");
                             }
                         });
                     }
 
                     @Override
                     public void onConnFail() {
-                        Log.d(TAG, "onConnFail: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onConnFail", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                mTvBleConn.setText("断开连接,重连");
                             }
                         });
                     }
@@ -48,44 +90,49 @@ public class MainActivity extends AppCompatActivity {
         });
 
         //开锁
-        findViewById(R.id.tv_unlock).setOnClickListener(new View.OnClickListener() {
+        mTvUnlock.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                BleManager.getInstance().unLock("F40011", new BleManager.OnLockOrUnLockListener() {
+                if (TextUtils.isEmpty(mNodeId)) {
+                    Toast.makeText(MainActivity.this, "请选择车位开锁", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                getLoadDialog().showDialog("请等待开锁");
+                mBleManager.unLock(mNodeId, new BleManager.OnLockOrUnLockListener() {
                     @Override
                     public void onLockOrUnLockWrite() {
-                        BleManager.getInstance().writeData("F40011");
+                        mBleManager.writeData(mNodeId);
                     }
 
                     @Override
                     public void onLockOrUnLockSuccess() {
-                        Log.d(TAG, "onLockOrUnLockSuccess: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockSuccess", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "开锁成功", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
 
                     @Override
                     public void onLockOrUnLockFail() {
-                        Log.d(TAG, "onLockOrUnLockFail: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockFail", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "开锁失败", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
 
                     @Override
                     public void onLockOrUnLockNoNeed() {
-                        Log.d(TAG, "onLockOrUnLockNoNeed: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockNoNeed", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "无需开锁", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
@@ -94,117 +141,145 @@ public class MainActivity extends AppCompatActivity {
         });
 
         //上锁
-        findViewById(R.id.tv_lock).setOnClickListener(new View.OnClickListener() {
+        mTvLock.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                BleManager.getInstance().lock("F40011", new BleManager.OnLockOrUnLockListener() {
+                if (TextUtils.isEmpty(mNodeId)) {
+                    Toast.makeText(MainActivity.this, "请选择车位上锁", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                getLoadDialog().showDialog("请等待上锁");
+                mBleManager.lock(mNodeId, new BleManager.OnLockOrUnLockListener() {
                     @Override
                     public void onLockOrUnLockWrite() {
-                        BleManager.getInstance().writeData("F40011");
+                        mBleManager.writeData(mNodeId);
                     }
 
                     @Override
                     public void onLockOrUnLockSuccess() {
-                        Log.d(TAG, "onLockOrUnLockSuccess: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockSuccess", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "上锁成功", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
 
                     @Override
                     public void onLockOrUnLockFail() {
-                        Log.d(TAG, "onLockOrUnLockFail: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockFail", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "上锁失败", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
 
                     @Override
                     public void onLockOrUnLockNoNeed() {
-                        Log.d(TAG, "onLockOrUnLockNoNeed: ");
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(MainActivity.this, "onLockOrUnLockNoNeed", Toast.LENGTH_SHORT).show();
+                                getLoadDialog().dismissDialog();
+                                Toast.makeText(MainActivity.this, "无需上锁", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
                 });
             }
         });
+    }
 
-        //下到位
-        findViewById(R.id.tv_down_correct).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                BleManager.getInstance().downCorrect("F40011", new BleManager.OnCorrectListener() {
-                    @Override
-                    public void onCorrectSuccess() {
-                        Log.d(TAG, "onCorrectSuccess: ");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(MainActivity.this, "onCorrectSuccess", Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onCorrectFail() {
-                        Log.d(TAG, "onCorrectFail: ");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(MainActivity.this, "onCorrectFail", Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
-                });
+    public LoadingDialog getLoadDialog() {
+        if (mLoadingDialog == null) {
+            synchronized (this) {
+                if (mLoadingDialog == null) {
+                    mLoadingDialog = new LoadingDialog(this);
+                }
             }
-        });
+        }
+        return mLoadingDialog;
+    }
 
-        //上到位
-        findViewById(R.id.tv_up_correct).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                BleManager.getInstance().upCorrect("F40011", new BleManager.OnCorrectListener() {
-                    @Override
-                    public void onCorrectSuccess() {
-                        Log.d(TAG, "onCorrectSuccess: ");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(MainActivity.this, "onCorrectSuccess", Toast.LENGTH_SHORT).show();
-                            }
-                        });
+    /**
+     * 选择车位
+     */
+    private void chooseCarPort() {
+        try {
+            getLoadDialog().showDialog("扫描设备,请等待");
+            mTvBleConn.setText("连接蓝牙");
+            mBleManager.scanBluetoothDevice(true);
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    mBluetoothDeviceList = mBleManager.getDeviceList();
+                    carPortNum = new String[mBluetoothDeviceList.size()];
+                    for (int i = 0; i < mBluetoothDeviceList.size(); i++) {
+                        switch (mBluetoothDeviceList.get(i).getName().substring(4, 10)) {
+                            case "B40001":
+                                carPortNum[i] = "GX-0000";
+                                break;
+                            case "B40003":
+                                carPortNum[i] = "GX-0001";
+                                break;
+                            case "B40005":
+                                carPortNum[i] = "GX-0002";
+                                break;
+                            case "B40006":
+                                carPortNum[i] = "GX-0003";
+                                break;
+                            case "B40007":
+                                carPortNum[i] = "GX-0004";
+                                break;
+                            default:
+                                carPortNum[i] = mBluetoothDeviceList.get(i).getName().substring(4, 10);
+                                break;
+                        }
                     }
-
-                    @Override
-                    public void onCorrectFail() {
-                        Log.d(TAG, "onCorrectFail: ");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Toast.makeText(MainActivity.this, "onCorrectFail", Toast.LENGTH_SHORT).show();
+                    mCarPortSpinner = new CarPortSpinner(MainActivity.this, mTvCarPort.getWidth(), carPortNum);
+                    mCarPortSpinner.showAsDropDown(mTvCarPort, 0, 2);//显示在rl_spinner的下方
+                    mCarPortSpinner.setOnDismissListener(new PopupWindow.OnDismissListener() {
+                        @Override
+                        public void onDismiss() {
+                            mCarPortSpinner.dismiss();
+                        }
+                    });
+                    //点击别处关闭spinner
+                    mCarPortSpinner.setTouchInterceptor(new View.OnTouchListener() {
+                        @Override
+                        public boolean onTouch(View v, MotionEvent event) {
+                            if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
+                                mCarPortSpinner.dismiss();
+                                return true;
                             }
-                        });
-                    }
-                });
-            }
-        });
+                            return false;
+                        }
+                    });
+                    //选择车位
+                    mCarPortSpinner.setOnItemClickListener(new SpinnerListAdapter.onItemClickListener() {
+                        @Override
+                        public void click(int position, View view) {
+                            mTvCarPort.setText(carPortNum[position]);
+                            mMacAddress = mBluetoothDeviceList.get(position).getAddress();
+                            mNodeId = mBluetoothDeviceList.get(position).getName().substring(4, 10);
+                            mBleManager.disConnect();
+                        }
+                    });
+                }
+            }, 5000);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-        //断开连接
-        findViewById(R.id.tv_close_connect).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                BleManager.getInstance().disConnect();
-            }
-        });
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mBleManager.disConnect();
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
     }
 }

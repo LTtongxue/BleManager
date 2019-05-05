@@ -12,10 +12,15 @@ import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class BleManager {
@@ -31,6 +36,9 @@ public class BleManager {
     private OnBleConnListener mOnBleConnListener;
     private OnLockOrUnLockListener mOnLockOrUnLockListener;
     private OnCorrectListener mOnCorrectListener;
+    private boolean mScanning;//扫描状态
+    private final static int SCAN_TIME = 5 * 1000;//扫描时间
+    private List<BluetoothDevice> deviceList = new ArrayList<>();//设备list
     private int type = 0;//开锁上锁、上下到位校准
 
     public static BleManager getInstance() {
@@ -41,6 +49,14 @@ public class BleManager {
         @SuppressLint("StaticFieldLeak")
         private static final BleManager sBleManager = new BleManager();
     }
+
+    @SuppressLint("HandlerLeak")
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+        }
+    };
 
     /**
      * 初始化
@@ -59,14 +75,47 @@ public class BleManager {
     }
 
     /**
+     * 蓝牙扫描结果的回调
+     */
+    public BluetoothAdapter.LeScanCallback scanCallBack = new BluetoothAdapter.LeScanCallback() {
+        @Override
+        public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+            if (device != null && device.getName() != null && device.getName().contains("B400")) {
+                deviceList.add(device);
+                deviceList = removeDuplicate(deviceList);
+            }
+        }
+    };
+
+    /**
+     * 扫描蓝牙设备
+     *
+     * @param enable
+     */
+    public void scanBluetoothDevice(boolean enable) {
+        if (enable) {
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    mScanning = false;
+                    mBluetoothAdapter.stopLeScan(scanCallBack);
+                }
+            }, SCAN_TIME);
+            mScanning = true;
+            mBluetoothAdapter.startLeScan(scanCallBack);
+        } else {
+            mScanning = false;
+            mBluetoothAdapter.stopLeScan(scanCallBack);
+        }
+    }
+
+    /**
      * 是否支持蓝牙
      *
      * @return true
      */
-    @SuppressLint("ObsoleteSdkInt")
     private boolean isSupportBle() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
-                && mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
     }
 
     /**
@@ -103,8 +152,10 @@ public class BleManager {
      */
     public void connectBle(String mac, OnBleConnListener onBleConnListener) {
         try {
-            //2s之后连接
-            Thread.sleep(2000);
+            if (mScanning) {
+                mBluetoothAdapter.stopLeScan(scanCallBack);
+                mScanning = false;
+            }
             mOnBleConnListener = onBleConnListener;
             closeConnect();
             //通过蓝牙设备地址 获取远程设备 开始连接
@@ -112,6 +163,10 @@ public class BleManager {
             //第二个参数 是否要自动连接
             if (mBluetoothDevice != null) {
                 mBluetoothGatt = mBluetoothDevice.connectGatt(mContext, false, gattCallBack);
+            }
+
+            if (!deviceList.contains(mBluetoothDevice)) {
+                deviceList.add(mBluetoothDevice);
             }
             Log.d(TAG, "BluetoothGatt.connect() == " + mBluetoothGatt.connect());
         } catch (Exception e) {
@@ -126,7 +181,7 @@ public class BleManager {
         try {
             if (mBluetoothDevice != null) {
                 mBluetoothGatt = mBluetoothDevice.connectGatt(mContext, false, gattCallBack);
-                Thread.sleep(2000);
+//                Thread.sleep(2000);
                 Log.d(TAG, "reconnectBle: ");
             }
         } catch (Exception e) {
@@ -372,7 +427,26 @@ public class BleManager {
                 }
                 Log.d(TAG, "发送：" + MISC.byteArray2String(data));
             }
-        }                                              
+        }
+    }
+
+    /**
+     * 去掉重复list
+     *
+     * @param list
+     * @return
+     */
+    public static List<BluetoothDevice> removeDuplicate(List<BluetoothDevice> list) {
+        Set set = new LinkedHashSet<>();
+        set.addAll(list);
+        list.clear();
+        list.addAll(set);
+        return list;
+    }
+
+    //设备列表
+    public List<BluetoothDevice> getDeviceList() {
+        return deviceList;
     }
 
     /**
@@ -389,7 +463,7 @@ public class BleManager {
                     return bool;
                 }
             } catch (Exception localException) {
-                Log.d(TAG, localException.toString());
+                Log.d(TAG, "localException:" + localException.toString());
             }
         }
         return false;
@@ -403,6 +477,9 @@ public class BleManager {
             return;
         }
         mBluetoothGatt.disconnect();
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
     }
 
     /**
@@ -415,6 +492,9 @@ public class BleManager {
         refreshDeviceCache();
         mBluetoothGatt.close();
         mBluetoothGatt = null;
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
 //        disableBluetooth();
     }
 }

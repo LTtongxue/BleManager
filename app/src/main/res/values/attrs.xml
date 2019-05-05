@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ATProgressView">
+        <attr name="outer_layer_slide_color" format="color" />
+        <attr name="outer_layer_stroke_color" format="color" />
+        <attr name="outer_layer_stroke_width" format="dimension" />
+        <attr name="middle_layer_bg_color" format="color" />
+        <attr name="middle_layer_progress_color" format="color" />
+        <attr name="middle_layer_progress_width" format="dimension" />
+        <attr name="middle_layer_small_circle_slide_color" format="color" />
+        <attr name="middle_layer_small_circle_stroke_color" format="color" />
+        <attr name="middle_layer_small_circle_size" format="dimension" />
+        <attr name="middle_layer_small_circle_stroke_width" format="dimension" />
+        <attr name="shadow_layer_color" format="color" />
+        <attr name="shadow_layer_inner_color" format="color" />
+        <attr name="inner_text_size" format="dimension" />
+        <attr name="inner_text_color" format="color" />
+    </declare-styleable>
+</resources>
